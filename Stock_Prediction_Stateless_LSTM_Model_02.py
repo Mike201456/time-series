@@ -3,7 +3,6 @@ from sklearn import preprocessing
 from keras.layers.core import Dense, Activation, Dropout
 from keras.layers.recurrent import LSTM
 from keras.models import Sequential
-import datetime
 from datetime import timedelta
 import matplotlib.pyplot as plt  # http://matplotlib.org/examples/pylab_examples/subplots_demo.html
 import csv
@@ -164,23 +163,6 @@ class rnn_lstm_regression(rnn_lstm):
             return False
         return True
 
-    def get_ref_price():
-        ref_tks = ['AMZN', 'GOOGL']
-        d = []
-        for i in ref_tks:
-            stkname_ref = "WIKI/" + str(i)
-            t = quandl.get(stkname_ref, authtoken='2c24stWyXfdzLVFWxGe4', start_date= '1980-01-01',
-                                    end_date='2017-10-09')
-
-            t = t[[ 'Adj. Close']]
-            t = t.rename(columns={"Adj. Close": str(i) + '_'+ "close"})
-            t['date'] = t.index
-            d.append(t)
-        df_ref = pd.concat(d, axis = 1)
-
-        return df_ref 
-
-
     def GetStockData_PriceVolume(self):
         '''
         All data is from quandl wiki dataset
@@ -190,39 +172,11 @@ class rnn_lstm_regression(rnn_lstm):
 
         # Prepare data frame
         stkname = "WIKI/" + str(self.paras.ticker)
-        # df = quandl.get(stkname, authtoken='2c24stWyXfdzLVFWxGe4', start_date=self.paras.start_date,
-        #                 end_date=self.paras.end_date)
-        # df = df[['Adj. Open', 'Adj. High', 'Adj. Low', 'Adj. Close', 'Adj. Volume']]
-        # df = df.rename(columns={"Adj. Open": "open", "Adj. High": "high", "Adj. Low": "low",
-        #                         "Adj. Close": "close", "Adj. Volume": "volume"})
-
-        ### add more data from here 
-
-        # get data for stock price 
-        df01 = quandl.get(stkname, authtoken='2c24stWyXfdzLVFWxGe4', start_date=self.paras.start_date,
+        df = quandl.get(stkname, authtoken='2c24stWyXfdzLVFWxGe4', start_date=self.paras.start_date,
                         end_date=self.paras.end_date)
-        df01 = df01[['Adj. Open', 'Adj. High', 'Adj. Low', 'Adj. Close', 'Adj. Volume']]
-        df01 = df01.rename(columns={"Adj. Open": "open", "Adj. High": "high", "Adj. Low": "low",
+        df = df[['Adj. Open', 'Adj. High', 'Adj. Low', 'Adj. Close', 'Adj. Volume']]
+        df = df.rename(columns={"Adj. Open": "open", "Adj. High": "high", "Adj. Low": "low",
                                 "Adj. Close": "close", "Adj. Volume": "volume"})
-        df01['date'] = df01.index
-        
-
-       
-        # get data for VIX 
-
-        # df_vix_1 = quandl.get("CHRIS/CBOE_VX1", authtoken="-Cd2GkPqwZYD7_NNFF4K")
-        # df_vix_1['date'] = df_vix_1.index
-
-
-        df = pd.concat([df01, self.get_ref_price()], axis = 1, join = 'date')
-
-        # combine all three datasets 
-
-        #df = pd.merge(pd.merge(df01, df_rate,  on = 'date'), df_vix_1, on = 'date')
-        #df = pd.merge(df01, df_vix_1, on = 'date')
-        ### get data end here 
-
-
         df_all = df.copy()
         df['MA'] = df['close'].rolling(window=self.paras.pred_len, center=False).mean()
 
@@ -234,13 +188,7 @@ class rnn_lstm_regression(rnn_lstm):
 
         # Generate input features for time series data
         featureset = list(['label'])
-
-        #featuresDict = {'c': 'close', 'h': 'high', 'l': 'low', 'o': 'open', 'v': 'volume'}
-
-        ### modify the featureDict 
-
-        featuresDict = {'c': 'close', 'h': 'high', 'l': 'low', 'o': 'open', 'v': 'volume', 'V': 'Value', 'a': 'AMAZ_close', 'g':'GOOGL_close'}
-
+        featuresDict = {'c': 'close', 'h': 'high', 'l': 'low', 'o': 'open', 'v': 'volume'}
         for i in range(self.paras.window_len, -1, -1):
             for j in list(self.paras.features):
                 df[j + '_-' + str(i) + '_d'] = df[featuresDict[j]].shift(1 * i)
@@ -302,7 +250,7 @@ class rnn_lstm_regression(rnn_lstm):
         new_list = ["a_+" + str(self.paras.pred_len) + '_d', "p_+" + str(self.paras.pred_len) + '_d',
                     'a_+' + str(self.paras.pred_len) + '_d_diff', 'p_+' + str(self.paras.pred_len) + '_d_diff']
 
-        default_list = ['open', 'high', 'low', 'close', 'volume', 'Value', 'AMAZ_close', 'GOOGL_close']
+        default_list = ['open', 'high', 'low', 'close', 'volume']
         original_other_list = set(df.columns) - set(default_list) - set(new_list)
         original_other_list = list(original_other_list)
         df = df[default_list + original_other_list + new_list]
